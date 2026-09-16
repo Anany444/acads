@@ -1209,3 +1209,312 @@ S1:     BTFSS   PIR1, TXIF   ; check if the Transmit-Interrupt Flag is set (hard
 ---
 
 *Compiled and expanded from personal handwritten class notes (dated 18/7/26 – 3/9/26) on Microcontrollers and Embedded Systems, focused on the PIC18 family.*
+
+
+---
+
+## 31. LCD Interfacing
+
+A **Liquid Crystal Display (LCD)** module commonly used with PIC18 has **14 pins**, split conceptually into three groups: a **power-supply group**, a **control group**, and a **data group**.
+
+| Pin # | Symbol | Group | Purpose |
+|---|---|---|---|
+| 1 | Vss | Power | Ground (0V) |
+| 2 | Vcc | Power | +5V supply |
+| 3 | Vee | Power | Contrast-control voltage |
+| 4 | RS | Control | Register Select |
+| 5 | R/W | Control | Read/Write select |
+| 6 | EN | Control | Enable (latch) |
+| 7–14 | D0–D7 | Data | 8-bit data bus |
+
+### Control Pins Explained
+
+**RS (Register Select)** — tells the LCD whether the byte currently on the data bus should be treated as a *command* or as *displayable data*:
+- **RS = 0** → **Instruction/command** register (e.g., "clear screen," "move cursor")
+- **RS = 1** → **Data** register (an actual character to be shown on screen)
+
+**R/W (Read/Write)** — controls the *direction* of data flow between the microcontroller and the LCD:
+- **R/W = 0 (Write)** → allows the microcontroller to **write** information (a command or a character) **into** the LCD.
+- **R/W = 1 (Read)** → allows the microcontroller to **read** data/status **back from** the LCD (used mainly to check the busy flag, below).
+
+**EN (Enable)** — this pin is used to **latch** whatever information is currently sitting on the data pins *into* the LCD. A **high-to-low pulse** on EN is the signal that tells the LCD: "the data on the bus right now is valid — read it and act on it." Without this pulse, the LCD ignores whatever is on the data lines.
+
+Characters are displayed using standard **ASCII codes** for numbers and letters — the same character-encoding idea used everywhere in computing.
+
+### Making Sure the LCD Is Ready
+
+An LCD needs a small amount of time to process each command before it can accept the next one. Two techniques handle this:
+
+1. **Fixed time delay** — simply wait a set amount of time (commonly **2–5 ms**) after sending each byte before sending the next one, using a delay subroutine. A short wait is often called **SDELAY** and a longer wait **LDELAY**, chosen depending on how long the specific command needs.
+2. **Busy-flag checking** — instead of guessing, actually **ask the LCD** if it's ready. Set R/W = 1 and RS = 0, then read back bit **D7**, which acts as the LCD's **Busy Flag**:
+   - **D7 = 0** → LCD is **free** (ready for the next instruction)
+   - **D7 = 1** → LCD is **busy** (keep waiting)
+
+### Typical PIC18-to-LCD Wiring
+A common setup connects the LCD's 8-bit data bus (D0–D7) to one full PIC18 port (e.g., PORTD: RD0–RD7), while three separate pins from another port (e.g., RB0, RB1, RB2) drive the LCD's **RS**, **R/W**, and **EN** control lines.
+
+```
+PIC18                LCD
+RD0–RD7  ───────►   D0–D7 (data bus)
+RB0      ───────►   RS
+RB1      ───────►   R/W
+RB2      ───────►   EN
+Vcc, Vee, Vss  ◄──── (LCD power/contrast supply)
+```
+
+---
+
+## 32. Keyboard Interfacing
+
+At the lowest hardware level, a keyboard's keys are **not** wired to individual pins one-by-one (that would need far too many pins). Instead, they are organized as a **matrix of rows and columns**.
+
+- The CPU accesses both rows and columns through its I/O ports. With **two 8-bit ports** (one driving rows, one reading columns), an **8×8 matrix — 64 keys** — can be scanned using just 16 pins total.
+- **When a key is pressed**, it physically connects one row wire to one column wire at that intersection point.
+- **When no key is pressed**, there is **no electrical connection** between any row and any column.
+- To find out *which* key was pressed, the microcontroller **scans** the matrix — it drives one row line active at a time and reads all the column lines, repeating for every row, until it detects which single row/column intersection made contact.
+
+**Real-world example:** In an IBM PC-style keyboard, a **single dedicated microcontroller** inside the keyboard housing takes care of *both* the hardware scanning of the key matrix *and* the software/communication protocol needed to report key-presses to the main computer — the PC's own CPU never has to scan the matrix itself.
+
+---
+
+## 33. Sensor and ADC (Actuator) Interfacing
+
+Many embedded systems must sense something happening in the physical world and then react to it. The general signal flow looks like this:
+
+```
+Sensor ──► ADC ──► CPU (Microcontroller) ──► Display / Actuator
+```
+
+- A **sensor** converts a **physical stimulus** (light, heat, pressure, sound, etc.) into a corresponding **electrical signal** — almost always an **analog** voltage that varies continuously.
+- Since microcontrollers only understand **digital** numbers, an **ADC (Analog-to-Digital Converter)** sits between the sensor and the CPU, converting that continuously-varying analog voltage into a discrete digital value the CPU can actually process, store, or display.
+
+### ADC Pin Concept
+```
+        Vref
+         │
+ Analog  ▼
+  Input ─► [ ADC ] ─► Digital Output (e.g. an 8-bit value, D0–D7)
+         │
+        GND
+```
+- **Vref (reference voltage)** sets the upper boundary of the measurement range — it tells the ADC "this voltage level corresponds to the maximum digital value."
+- The **analog input** pin receives the raw sensor voltage.
+- The **digital output** pins present the converted numeric result to the CPU.
+
+### Actuators — the Other Half of the Loop
+Where a **sensor** turns a physical event *into* an electrical/digital signal, an **actuator** does the reverse: it is a device that **produces a physical action based on a command/input coming from the sensor (via the CPU)**. Examples include motors, buzzers, relays, and LEDs — anything that *does something physical* in response to what the system decided based on sensor data.
+
+---
+
+## 34. Interrupts in PIC18
+
+An **interrupt** is a signal that temporarily **pauses whatever the CPU is currently doing**, so it can immediately respond to an important event, and then **resumes the original program exactly where it left off** once the event has been handled.
+
+### Sources of Interrupts in PIC18
+| # | Source | Details |
+|---|---|---|
+| 1 | **Timers** | 4 timers → 4 separate timer-overflow interrupts |
+| 2 | **External hardware interrupts** | 3 dedicated pins: **INT0** → RB0 (PORTB bit 0), **INT1** → RB1 (PORTB bit 1), **INT2** → RB2 (PORTB bit 2) |
+| 3 | **USART** | Separate interrupts for **Tx** (transmit complete) and **Rx** (receive complete) |
+| 4 | **ADC** | 2 interrupts (conversion-complete related) |
+| 5 | **CCP** (Capture / Compare / Pulse-Width Modulation) | 2 interrupts |
+
+### Flag, Register, and Enable Bits
+Every interrupt source is tracked using three related bits:
+- A **Flag bit** — automatically **set by hardware** the moment the interrupt event happens (the programmer must manually clear it after handling the interrupt).
+- An **Enable bit** — must be **set by software** to allow that specific interrupt to actually reach the CPU.
+- Both bits usually live inside specific **registers**.
+
+| Interrupt | Flag Bit | Register | Enable Bit |
+|---|---|---|---|
+| Timer0 | TMR0IF | INTCON | TMR0IE |
+| Timer1 | TMR1IF | PIR2 | TMR1IE |
+| Timer2 | TMR2IF | PIR1 | TMR2IE |
+| Timer3 | TMR3IF | PIR2 | TMR3IE |
+
+Internally, all of these individual flag bits feed through a chain of logic gates, gated by the **Peripheral Interrupt Enable (PEIE)** bit and finally the **Global Interrupt Enable (GIE)** bit, before producing a single combined signal that actually redirects the CPU to the interrupt vector location.
+
+---
+
+## 35. Enabling Interrupts and Setting Priority
+
+### Interrupts Are OFF by Default
+Immediately after **any reset**, **all interrupts are disabled** — meaning the microcontroller will **not** respond to any interrupt request until the programmer explicitly turns interrupts on in software.
+
+### The Master Switch: GIE
+Bit **D7 of the INTCON register** is the **Global Interrupt Enable (GIE)** bit — the single master switch controlling whether *any* interrupt can reach the CPU at all.
+```asm
+BSF   INTCON, GIE     ; GIE = 1 → enable all (individually-enabled) interrupts
+BCF   INTCON, GIE     ; GIE = 0 → disable ALL interrupts
+```
+
+### Enabling a Specific Interrupt
+Even with GIE set, each individual interrupt source must **also** be separately enabled. Example, for the external interrupt INT0:
+```asm
+BSF   INTCON, INT0IE   ; INT0IE = 1 → enable INT0,  0 → disable INT0
+```
+
+### Choosing the Trigger Edge (External Interrupts)
+External interrupt pins can be configured to respond to either a rising or a falling voltage transition, using the **INTEDG** bit:
+```
+INTEDG = 0  →  triggers on a -ve (falling) edge
+INTEDG = 1  →  triggers on a +ve (rising) edge
+```
+
+### Interrupt Vector Table (IVT) and Priority
+When an enabled interrupt occurs, PIC18 immediately jumps to a **fixed memory address** — the **Interrupt Vector Table** — which redirects execution to the correct handler code:
+
+| Priority | Vector Address |
+|---|---|
+| **High priority** | **0x0008** |
+| **Low priority** | **0x0018** |
+
+By default, **immediately after a Power-On Reset, every interrupt is automatically designated as high priority** (and therefore routes to 0x0008), until the programmer explicitly reassigns specific interrupts to low priority.
+
+Priority-selection bits for a few specific peripherals:
+- **RCIP** and **TXIP** — set the priority (high/low) of the USART's **Receive** and **Transmit** interrupts respectively.
+- **TMR0IP**, **TMR2IP** — set the priority of the corresponding **timer** interrupts.
+
+---
+
+## 36. Polling vs. Interrupt-Driven I/O, and the ISR Mechanism
+
+There are two fundamentally different strategies a microcontroller can use to react to events from a device or peripheral:
+
+### Polling Method
+The CPU sits in a loop, **continuously and repeatedly checking** a status flag/bit to see whether a device needs attention — this is exactly what you saw earlier in Section 30's `S1: BTFSS PIR1, TXIF / BRA S1` loop, which keeps re-checking the USART transmit-ready flag.
+- ✅ Simple to write.
+- ❌ Wastes CPU time — the processor can't do anything else useful while stuck checking the flag over and over.
+
+### Interrupt-Driven Method
+Instead of the CPU constantly *asking* "are you ready yet?", the device itself **sends an interrupt signal** the instant it needs attention. The CPU is free to do other useful work in the meantime, and only stops to deal with the event once it's actually notified.
+- ✅ Much more efficient use of CPU time.
+- ❌ Slightly more setup work (flags, enable bits, priority, and a dedicated handler routine).
+
+### What Exactly Happens During an Interrupt (Step-by-Step)
+1. The CPU finishes executing whatever instruction it is currently on.
+2. It automatically **saves the current Program Counter** (the return address) **onto the stack**, so it knows exactly where to come back to later.
+3. It looks up the correct entry in the **Interrupt Vector Table (IVT)** — address **0x0008** for high priority, **0x0018** for low priority — which points it to the start of the **Interrupt Service Routine (ISR)**.
+4. Execution jumps into the **ISR**: the block of code specifically written to handle that event (e.g., reading in received serial data, reloading a timer, etc.).
+5. At the very end of the ISR, the special instruction **`RETFIE`** (**RET**urn **F**rom **I**nterrupt, with **E**nable) runs. `RETFIE` **pops the saved return address off the stack back into the Program Counter** and **automatically re-enables the GIE bit** — resuming the main program exactly where it left off, as if nothing had happened.
+
+```asm
+; --- inside an ISR ---
+    ; ... handle the interrupting event here ...
+    BCF     PIR1, TXIF     ; clear the flag that caused this interrupt
+    RETFIE                 ; return to main program & re-enable interrupts
+```
+
+**Practice exercise (extending Section 30's example):** Rewrite the "continuously transmit the letter 'G' at 9600 baud, 10 MHz crystal" program using the **interrupt-driven** method instead of polling — enable the USART Transmit Interrupt (`TXIE`), write an ISR that loads `TXREG` with `'G'` each time the transmit-ready interrupt fires, and let the main program idle (or do other work) between interrupts, instead of sitting in a `BTFSS`/`BRA` polling loop.
+
+---
+
+### Quick-Reference Additions
+
+| Concept | One-Line Summary |
+|---|---|
+| LCD RS pin | 0 = command, 1 = data |
+| LCD R/W pin | 0 = write, 1 = read |
+| LCD EN pin | High-to-low pulse latches data into the LCD |
+| LCD Busy Flag (D7) | 0 = ready, 1 = busy |
+| Keyboard matrix | Row/column grid; a keypress connects one row to one column |
+| ADC | Converts a sensor's analog voltage into a digital value for the CPU |
+| Actuator | Produces a physical action based on CPU/sensor input |
+| GIE | Master enable switch for all interrupts (INTCON bit 7) |
+| High/Low priority vectors | 0x0008 / 0x0018 |
+| Polling | CPU repeatedly checks a flag — simple but wastes CPU time |
+| Interrupt-driven | Device signals the CPU when ready — efficient, needs an ISR |
+| RETFIE | Ends an ISR: restores PC from stack + re-enables GIE |
+
+
+---
+
+## 37. Analog-to-Digital Converter (ADC) — In Detail
+
+Section 33 introduced the ADC's role in the sensor → ADC → CPU signal chain. This section goes deeper into how the PIC18's built-in ADC module actually works and how to program it.
+
+### Why "Resolution" Matters
+An ADC's **resolution** is the number of bits it uses to represent the converted analog voltage — this determines how *finely* it can distinguish between voltage levels.
+
+$$ \text{Number of discrete digital steps} = 2^n $$
+
+where **n** is the resolution in bits. PIC18 typically provides a **10-bit ADC**, meaning it can represent any input voltage as one of **2¹⁰ = 1024** distinct digital values (0 to 1023).
+
+### The Conversion Formula
+The digital result relates to the input voltage and the reference voltage like this:
+
+$$ \text{Digital Output} = \frac{V_{in}}{V_{ref}} \times (2^n - 1) $$
+
+**Worked Example:** For a 10-bit ADC with **Vref = 5V**, an input of **Vin = 2.5V** (exactly half of Vref) gives:
+```
+Digital Output = (2.5 / 5) × 1023 = 0.5 × 1023 ≈ 511 (or 512, i.e. 0x1FF / 0x200)
+```
+This means the ADC's smallest detectable voltage "step" (its resolution in volts) is:
+```
+Step size = Vref / (2^n - 1) = 5V / 1023 ≈ 4.89 mV
+```
+So the ADC can only distinguish between voltages that differ by roughly 4.89 mV or more — any smaller difference reads as the same digital value.
+
+### Multiplexed Input Channels
+A single PIC18 chip has only **one** actual ADC conversion circuit, but it can be connected to **multiple analog input pins** (commonly labeled **AN0, AN1, AN2, …**) through an internal **multiplexer** (a switch that selects one input at a time). This is why the notes mention PIC chips supporting "**4 channels**" or more — the same ADC hardware is time-shared across several sensor input pins, one channel at a time.
+
+### The Two Control Registers: ADCON0 and ADCON1
+| Register | Purpose |
+|---|---|
+| **ADCON0** | Turns the ADC module ON/OFF, selects **which channel** (AN0, AN1, …) to convert, and starts/monitors the conversion |
+| **ADCON1** | Configures **which pins** behave as analog inputs vs. ordinary digital I/O pins, and selects the **voltage reference source** (Vref+ / Vref−) |
+
+**Key bits inside ADCON0:**
+- **ADON** — ADC module On/Off. `1` = ADC circuit powered on, `0` = off (saves power when not converting).
+- **CHS (Channel Select bits)** — chooses which analog pin (AN0, AN1, AN2, …) is currently connected to the converter.
+- **GO/DONE** — a single bit that does double duty:
+  - Set it to **1** in software to **start** a conversion.
+  - The hardware **automatically clears it back to 0** the moment the conversion finishes — so the program can simply keep checking this bit to know when the result is ready (a form of polling, just like Section 36's `BTFSS` pattern).
+
+**Key bits inside ADCON1:**
+- **PCFG bits** — configure each of the AN pins individually as either an **analog input** or a plain **digital I/O** pin (a pin can't be both at once).
+- **Voltage reference select** — chooses whether Vref+/Vref− come from the chip's own supply (Vdd/Vss) or from external reference pins.
+
+### Where the Result Is Stored: ADRESH and ADRESL
+Since the ADC produces a **10-bit** result but PIC18 registers are only **8 bits wide**, the result is split across **two** registers:
+- **ADRESH** — holds part of the 10-bit result (upper byte, by default)
+- **ADRESL** — holds the remaining bits (lower byte, by default)
+
+The **ADFM** bit (in ADCON2, on chips that have it) lets you choose whether the 10 result bits are **right-justified** (result fits neatly into ADRESL + the low 2 bits of ADRESH — easiest for direct math) or **left-justified** (result occupies the high bits — historically used for quick 8-bit-only readings by just reading ADRESH alone).
+
+### Step-by-Step: Performing One ADC Conversion
+1. **Configure** ADCON1 — decide which pins are analog, and pick the voltage reference.
+2. **Select the channel** to read, using the CHS bits in ADCON0.
+3. **Turn the ADC on**, set `ADON = 1`.
+4. **Wait for acquisition time** — a brief pause (often a few microseconds) that lets the ADC's internal sample-and-hold capacitor fully charge to the input voltage before conversion begins. Skipping this can give an inaccurate reading.
+5. **Start the conversion**: set `GO/DONE = 1`.
+6. **Poll** the GO/DONE bit in a loop, waiting for it to clear back to `0` (hardware signals conversion complete).
+7. **Read the result** out of `ADRESH:ADRESL`.
+
+### Example Assembly Skeleton
+```asm
+        BSF     ADCON0, ADON     ; turn ADC module ON
+        BCF     ADCON0, CHS0     ; select channel AN0 (example)
+        CALL    ACQ_DELAY        ; short delay for acquisition time
+        BSF     ADCON0, GO       ; start conversion (GO/DONE = 1)
+
+WAIT:   BTFSC   ADCON0, GO       ; keep checking: is GO/DONE still set?
+        BRA     WAIT             ; if yes, conversion still running — keep waiting
+                                  ; once GO/DONE clears to 0, conversion is done
+
+        MOVF    ADRESH, W        ; read the result's high byte into WREG
+        MOVWF   RESULT_HI
+        MOVF    ADRESL, W        ; read the result's low byte into WREG
+        MOVWF   RESULT_LO
+```
+
+### Quick-Reference Additions
+
+| Concept | One-Line Summary |
+|---|---|
+| ADC Resolution | Number of bits used to represent the converted value; PIC18 typically = 10-bit (1024 steps) |
+| ADCON0 | Turns ADC on/off, selects the input channel, starts the conversion (GO/DONE bit) |
+| ADCON1 | Configures which pins are analog vs digital, and selects the voltage reference |
+| ADRESH:ADRESL | The two 8-bit registers that together hold the 10-bit conversion result |
+| Acquisition time | Brief wait before conversion, letting the sample-and-hold capacitor charge fully |
+| GO/DONE bit | Set by software to start a conversion; cleared automatically by hardware when done |
