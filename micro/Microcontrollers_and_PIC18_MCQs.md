@@ -271,3 +271,197 @@ Based on the companion notes file (`Microcontrollers_and_PIC18_Notes.md`). Try t
 - **Q34:** `CALL` = long call (4 bytes, unlimited range); `RCALL` = relative/short call (2 bytes, limited range but faster/smaller).
 - **Q37:** 16 MHz ÷ 4 = 4 MHz instruction-cycle frequency → T = 1 / 4 MHz = **0.25 µs**.
 - **Q39:** Checksum = (sum of all data bytes, carry dropped) → then take the **2's complement** of that result.
+
+
+---
+
+## Additional Practice MCQs (Q41–Q55) — LCD, Keyboard, Sensors & PIC18 Interrupts
+
+**Q41.** A standard LCD module interfaced with a PIC microcontroller typically has how many pins?
+- A) 8
+- B) 14
+- C) 16
+- D) 20
+
+**Q42.** Which LCD control pin determines whether the byte on the data bus is treated as a command or as displayable character data?
+- A) EN
+- B) RS
+- C) R/W
+- D) Vee
+
+**Q43.** On an LCD, setting RS = 0 means:
+- A) The data bus holds a character to display
+- B) The instruction/command register is selected
+- C) The LCD is currently busy
+- D) The backlight is being powered
+
+**Q44.** What is the specific function of the LCD's EN (Enable) pin?
+- A) It sets the display contrast
+- B) It selects between read and write direction
+- C) It latches whatever data is currently on the data pins into the LCD
+- D) It powers the LCD's backlight
+
+**Q45.** When reading the LCD's busy flag (R/W = 1, RS = 0), what does D7 = 1 mean?
+- A) The LCD is free and ready for the next instruction
+- B) The LCD is busy and not yet ready for the next instruction
+- C) A power failure has occurred
+- D) A parity error has occurred
+
+**Q46.** At the lowest hardware level, how are the keys of a keyboard typically organized?
+- A) As a matrix of rows and columns
+- B) As individually wired dedicated pins for every key
+- C) As a single serial shift register
+- D) As an analog voltage-divider ladder
+
+**Q47.** Using two dedicated 8-bit I/O ports (one for rows, one for columns), how large a keypad matrix can a microcontroller scan?
+- A) 2×2
+- B) 4×4
+- C) 8×8
+- D) 16×16
+
+**Q48.** In a sensor-based embedded system, what role does the ADC play between the sensor and the CPU?
+- A) It amplifies the digital output signal
+- B) It converts the sensor's analog voltage into a digital value the CPU can process
+- C) It stores sensor readings permanently, like a hard disk
+- D) It supplies power to the sensor
+
+**Q49.** Which best describes an "actuator" in an embedded system?
+- A) A device that converts a physical stimulus into an electrical signal
+- B) A device that produces a physical action based on a command/input from the microcontroller
+- C) A special type of ADC
+- D) A type of interrupt flag
+
+**Q50.** How many dedicated external hardware interrupt pins does PIC18 provide, and where are they located?
+- A) 2 pins on PORTA
+- B) 3 pins (INT0, INT1, INT2) on PORTB (RB0, RB1, RB2)
+- C) 4 pins on PORTC
+- D) 1 pin on PORTD
+
+**Q51.** Immediately after any reset (power-on or otherwise), what is the default state of all interrupts on a PIC18?
+- A) All interrupts are enabled automatically
+- B) All interrupts are disabled by default and must be enabled by software
+- C) Only the timer interrupts are enabled by default
+- D) Interrupts cannot be configured at all after a reset
+
+**Q52.** Which single bit acts as the master "global" switch that must be set before ANY interrupt can reach the CPU?
+- A) INTEDG
+- B) TMR0IE
+- C) GIE (bit 7 of INTCON)
+- D) RCIP
+
+**Q53.** In the PIC18 interrupt vector table, which addresses are used for high-priority and low-priority interrupts respectively?
+- A) 0x0008 (high), 0x0018 (low)
+- B) 0x0000 (high), 0x0004 (low)
+- C) 0x0018 (high), 0x0008 (low)
+- D) Both priorities share the same address, 0x0008
+
+**Q54.** What is the main advantage of an interrupt-driven approach over a polling approach?
+- A) It requires writing less overall code
+- B) The CPU can perform other useful work instead of continuously checking a status flag, and reacts immediately once notified
+- C) It removes the need for a stack entirely
+- D) It works without enabling any control bits
+
+**Q55.** What does the `RETFIE` instruction do at the end of an Interrupt Service Routine (ISR)?
+- A) It permanently disables all future interrupts
+- B) It pops the saved return address from the stack back into the Program Counter and re-enables the GIE bit, resuming the main program
+- C) It clears the LCD display
+- D) It performs a full microcontroller reset
+
+---
+
+## Answer Key (Q41–Q55)
+
+| Q | Answer | Q | Answer | Q | Answer |
+|---|---|---|---|---|---|
+| 41 | B | 47 | C | 53 | A |
+| 42 | B | 48 | B | 54 | B |
+| 43 | B | 49 | B | 55 | B |
+| 44 | C | 50 | B | | |
+| 45 | B | 51 | B | | |
+| 46 | A | 52 | C | | |
+
+### Quick Explanations
+- **Q41:** Standard interfacing LCDs used in this course have **14 pins** (16-pin versions add two backlight pins, but the core interface is 14).
+- **Q50:** PIC18's three external interrupts map directly onto PORTB pins: **INT0→RB0, INT1→RB1, INT2→RB2**.
+- **Q53:** Right after reset, every interrupt defaults to *high priority*, so it's worth remembering **0x0008 = high**, **0x0018 = low**.
+- **Q55:** `RETFIE` is essentially "RETURN" plus "re-enable GIE" in one instruction — it's what lets the main program keep running normally after each interrupt is serviced.
+
+---
+
+## Additional Practice MCQs (Q56–Q65) — ADC in Detail
+
+**Q56.** For a 10-bit ADC, how many distinct digital output values can it represent?
+- A) 10
+- B) 256
+- C) 1024
+- D) 2048
+
+**Q57.** Using the formula Digital Output = (Vin / Vref) × (2ⁿ − 1), what is the approximate digital output of a 10-bit ADC with Vref = 5V and Vin = 2.5V?
+- A) About 128
+- B) About 255
+- C) About 511
+- D) About 1023
+
+**Q58.** Why does a single PIC18 chip need a multiplexer for its ADC even though it can read several analog pins (AN0, AN1, AN2, …)?
+- A) Because each analog pin has its own separate, independent ADC circuit
+- B) Because there is only one physical ADC conversion circuit, time-shared across the analog input pins
+- C) Because the multiplexer converts digital signals to analog
+- D) Because the multiplexer stores the final result permanently
+
+**Q59.** Which register is primarily responsible for selecting the ADC channel and starting a conversion?
+- A) ADCON1
+- B) TRISA
+- C) ADCON0
+- D) PORTA
+
+**Q60.** Which register configures whether each AN pin behaves as an analog input or a plain digital I/O pin, and selects the voltage reference source?
+- A) ADCON0
+- B) ADCON1
+- C) ADRESH
+- D) INTCON
+
+**Q61.** In ADCON0, what does setting the GO/DONE bit to 1 do?
+- A) It immediately clears the ADC result registers
+- B) It starts an ADC conversion
+- C) It turns the entire ADC module off
+- D) It selects channel AN0 specifically
+
+**Q62.** How does the GO/DONE bit behave once an ADC conversion finishes?
+- A) It stays at 1 until manually cleared by software
+- B) It is automatically cleared to 0 by hardware, signaling the conversion is complete
+- C) It toggles between 0 and 1 continuously
+- D) It has no relationship to conversion completion
+
+**Q63.** Why is a short "acquisition time" delay needed before starting an ADC conversion?
+- A) To let the CPU clock stabilize
+- B) To let the ADC's internal sample-and-hold capacitor fully charge to the input voltage, ensuring an accurate reading
+- C) To reset the ADCON1 register
+- D) To allow the LCD busy flag to clear
+
+**Q64.** Since PIC18 registers are only 8 bits wide but the ADC produces a 10-bit result, where is that result stored?
+- A) Entirely within ADCON0
+- B) Split across the two registers ADRESH and ADRESL
+- C) Directly inside WREG only
+- D) In the STATUS register's unused bits
+
+**Q65.** What is the smallest voltage difference (approximate resolution step) a 10-bit ADC with Vref = 5V can distinguish?
+- A) About 4.89 mV
+- B) About 48.9 mV
+- C) About 489 mV
+- D) About 5 mV
+
+---
+
+## Answer Key (Q56–Q65)
+
+| Q | Answer | Q | Answer |
+|---|---|---|---|
+| 56 | C | 61 | B |
+| 57 | C | 62 | B |
+| 58 | B | 63 | B |
+| 59 | C | 64 | B |
+| 60 | B | 65 | A |
+
+### Quick Explanations
+- **Q57:** (2.5V / 5V) × 1023 ≈ **511–512**, i.e. exactly half of the full 10-bit range — makes sense since Vin is exactly half of Vref.
+- **Q65:** Step size = Vref / (2ⁿ − 1) = 5V / 1023 ≈ **4.89 mV** — the same figure worked out in the notes.
